@@ -9,8 +9,7 @@ import (
 	"unsafe"
 )
 
-func encryptEightBlocks(nr int, xk *uint32, dst, counter *byte)
-func fillBuffer(bufferBase, counterBase *byte, size int)
+func fillEightBlocks(nr int, xk *uint32, dst, counter *byte)
 
 // streamBufferSize is the number of bytes of encrypted counter values to cache.
 const streamBufferSize = 32 * BlockSize
@@ -38,11 +37,10 @@ func (c *aesCipherAsm) NewCTR(iv []byte) cipher.Stream {
 }
 
 func (c *aesctr) refill() {
-	// Fill up the buffer with an incrementing count.
+	// Fill up the buffer with incrementing counters encrypted.
 	c.buffer = c.storage[:streamBufferSize]
-	fillBuffer(&c.buffer[0], &c.ctr[0], streamBufferSize)
 	for i := 0; i < len(c.buffer); i += BlockSize * 8 {
-		encryptEightBlocks(c.nr, &c.block.enc[0], &c.buffer[i], &c.buffer[i])
+		fillEightBlocks(c.nr, &c.block.enc[0], &c.buffer[i], &c.ctr[0])
 	}
 }
 

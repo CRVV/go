@@ -4,25 +4,60 @@
 
 #include "textflag.h"
 
-// func encryptEightBlocks(nr int, xk *uint32, dst, src *byte)
-TEXT ·encryptEightBlocks(SB),0,$112-32
+DATA bswapMask<>+0x00(SB)/8, $0x08090a0b0c0d0e0f
+DATA bswapMask<>+0x08(SB)/8, $0x0001020304050607
+GLOBL bswapMask<>(SB), (NOPTR+RODATA), $16
+
+// func fillEightBlocks(nr int, xk *uint32, dst, counter *byte)
+TEXT ·fillEightBlocks(SB),0,$112-32
+#define BSWAP X2
 #define aesRound AESENC X1, X8; AESENC X1, X9; AESENC X1, X10; AESENC X1, X11; \
-            AESENC X1, X12; AESENC X1, X13; AESENC X1, X14; AESENC X1, X15;
+	             AESENC X1, X12; AESENC X1, X13; AESENC X1, X14; AESENC X1, X15;
+#define increment(i) ADDQ $1, R9; ADCQ $0, R8; \
+	                 MOVQ R9, (i*16)(SP); MOVQ R8, (i*16+8)(SP);
 	MOVQ nr+0(FP), CX
 	MOVQ xk+8(FP), AX
 	MOVQ dst+16(FP), DX
-	MOVQ src+24(FP), BX
+	MOVQ counter+24(FP), BX
 	MOVOU 0(AX), X1
+	MOVOU bswapMask<>(SB), BSWAP
 	ADDQ $16, AX
 
 	MOVOU 0(BX), X8
-	MOVOU 16(BX), X9
-	MOVOU 32(BX), X10
-	MOVOU 48(BX), X11
-	MOVOU 64(BX), X12
-	MOVOU 80(BX), X13
-	MOVOU 96(BX), X14
-	MOVOU 112(BX), X15
+	MOVQ 0(BX), R8
+	MOVQ 8(BX), R9
+	BSWAPQ R8
+	BSWAPQ R9
+
+	increment(0)
+	increment(1)
+	increment(2)
+	increment(3)
+	increment(4)
+	increment(5)
+	increment(6)
+
+	ADDQ $1, R9
+	ADCQ $0, R8
+	BSWAPQ R8
+	BSWAPQ R9
+	MOVQ R8, 0(BX)
+	MOVQ R9, 8(BX)
+
+	MOVOU 0(SP), X9
+	MOVOU 16(SP), X10
+	MOVOU 32(SP), X11
+	MOVOU 48(SP), X12
+	MOVOU 64(SP), X13
+	MOVOU 80(SP), X14
+	MOVOU 96(SP), X15
+	PSHUFB BSWAP, X9
+	PSHUFB BSWAP, X10
+	PSHUFB BSWAP, X11
+	PSHUFB BSWAP, X12
+	PSHUFB BSWAP, X13
+	PSHUFB BSWAP, X14
+	PSHUFB BSWAP, X15
 
 	PXOR X1, X8
 	PXOR X1, X9
@@ -38,15 +73,15 @@ TEXT ·encryptEightBlocks(SB),0,$112-32
 	JB Lenc128
 Lenc256:
 	MOVOU 0(AX), X1
-    aesRound
+	aesRound
 	MOVOU 16(AX), X1
-    aesRound
+	aesRound
 	ADDQ $32, AX
 Lenc196:
 	MOVOU 0(AX), X1
-    aesRound
+	aesRound
 	MOVOU 16(AX), X1
-    aesRound
+	aesRound
 	ADDQ $32, AX
 Lenc128:
 	MOVOU 0(AX), X1
@@ -87,32 +122,4 @@ Lenc128:
 	MOVOU X14, 96(DX)
 	MOVOU X15, 112(DX)
 	RET
-
-// func fillBuffer(bufferBase, counterBase *byte, size int)
-TEXT ·fillBuffer(SB),NOSPLIT,$0
-    MOVQ    bufferBase+0(FP), BX
-    MOVQ    counterBase+8(FP), R8
-    MOVQ    size+16(FP), R9
-    SHRQ    $4, R9
-    SHLQ    $4, R9
-    MOVQ    (R8), R11
-    MOVQ    8(R8), R12
-    XORQ    CX, CX
-
-loop:
-    MOVQ    R11, (BX)(CX*1)
-    MOVQ    R12, 8(BX)(CX*1)
-    ADDQ    $16, CX
-    BSWAPQ  R11
-    BSWAPQ  R12
-    ADDQ    $1, R12
-    ADCQ    $0, R11
-    BSWAPQ  R12
-    BSWAPQ  R11
-    CMPQ    CX, R9
-    JL      loop
-
-    MOVQ    R11, (R8)
-    MOVQ    R12, 8(R8)
-    RET
 
