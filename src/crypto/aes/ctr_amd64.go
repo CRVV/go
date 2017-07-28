@@ -4,11 +4,16 @@
 
 package aes
 
-import (
-	"crypto/cipher"
-	"unsafe"
-)
+import "crypto/cipher"
 
+// xorBytes xors the contents of a and b and places the resulting values into
+// dst. If a and b are not the same length then the number of bytes processed
+// will be equal to the length of shorter of the two. Returns the number
+// of bytes processed.
+//go:noescape
+func xorBytes(dst, a, b []byte) int
+
+//go:noescape
 func fillEightBlocks(nr int, xk *uint32, dst, counter *byte)
 
 // streamBufferSize is the number of bytes of encrypted counter values to cache.
@@ -53,33 +58,9 @@ func (c *aesctr) XORKeyStream(dst, src []byte) {
 		if len(c.buffer) == 0 {
 			c.refill()
 		}
-		n := fastXORBytes(dst, src, c.buffer)
+		n := xorBytes(dst, src, c.buffer)
 		c.buffer = c.buffer[n:]
 		src = src[n:]
 		dst = dst[n:]
 	}
-}
-
-func fastXORBytes(dst, a, b []byte) int {
-	wordSize := 8
-	n := len(a)
-	if len(b) < n {
-		n = len(b)
-	}
-
-	w := n / wordSize
-	if w > 0 {
-		dw := *(*[]uintptr)(unsafe.Pointer(&dst))
-		aw := *(*[]uintptr)(unsafe.Pointer(&a))
-		bw := *(*[]uintptr)(unsafe.Pointer(&b))
-		for i := 0; i < w; i++ {
-			dw[i] = aw[i] ^ bw[i]
-		}
-	}
-
-	for i := (n - n%wordSize); i < n; i++ {
-		dst[i] = a[i] ^ b[i]
-	}
-
-	return n
 }
