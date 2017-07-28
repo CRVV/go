@@ -88,3 +88,31 @@ Lenc128:
 	MOVOU X15, 112(DX)
 	RET
 
+// func fillBuffer(bufferBase, counterBase *byte, size int)
+TEXT ·fillBuffer(SB),NOSPLIT,$0
+    MOVQ    bufferBase+0(FP), BX
+    MOVQ    counterBase+8(FP), R8
+    MOVQ    size+16(FP), R9
+    SHRQ    $4, R9
+    SHLQ    $4, R9
+    MOVQ    (R8), R11
+    MOVQ    8(R8), R12
+    XORQ    CX, CX
+
+loop:
+    MOVQ    R11, (BX)(CX*1)
+    MOVQ    R12, 8(BX)(CX*1)
+    ADDQ    $16, CX
+    BSWAPQ  R11
+    BSWAPQ  R12
+    ADDQ    $1, R12
+    ADCQ    $0, R11
+    BSWAPQ  R12
+    BSWAPQ  R11
+    CMPQ    CX, R9
+    JL      loop
+
+    MOVQ    R11, (R8)
+    MOVQ    R12, 8(R8)
+    RET
+
